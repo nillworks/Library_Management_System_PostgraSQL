@@ -1,0 +1,423 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id          String   @id @default(uuid())  //1, 2 3
+  name        String
+  email       String   @unique
+  password    String
+  photoUrl    String?  // "1" 
+  age         Int?   // 1, 2
+  phone       String?
+  address     String?
+  role        String   @default("user") // "user", "librarian", "admin"
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  membership  Membership?
+  borrowings  Borrowing[]
+  fines       Fine[]
+  notifications Notification[]
+  notificationSettings NotificationSettings?
+  payments    Payment[]
+
+  reservation Reservation[]
+  bookreview BookReview[]
+  inventorylogs InventoryLog[]
+  bookcondition BookCondition[]
+
+  @@map("users")
+}
+
+// ! step 2 I working
+model Membership {
+  id          String      @id @default(uuid())
+  userId      String      @unique
+  type        MembershipType @default(BASIC)
+  status      MembershipStatus @default(ACTIVE)
+  startDate   DateTime    @default(now())
+  endDate     DateTime?
+  maxBooks    Int         @default(3)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  // Relations
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("memberships")
+}
+
+enum MembershipType {
+  BASIC
+  PREMIUM
+  STUDENT
+  FACULTY
+}
+
+enum MembershipStatus {
+  ACTIVE
+  SUSPENDED
+  EXPIRED
+  CANCELLED
+}
+
+// ==================== BOOK MANAGEMENT ====================
+
+model Book {
+  id          String   @id @default(uuid())
+  isbn        String?  @unique
+  title       String
+  author      String
+  publisher   String?
+  publishedYear Int?
+  genre       String?
+  description String?
+  price       Int
+  totalCopies Int      @default(1)
+  availableCopies Int  @default(1)
+  language    String   @default("English")
+  pages       Int?
+  imageUrl    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  borrowings  Borrowing[]
+  categories  BookCategory[]
+  reviews     BookReview[]
+  reservations Reservation[]
+  bookAuthor BookAuthor[]
+  inventorylogs InventoryLog[]
+  bookcondition BookCondition[]
+
+  @@map("books")
+}
+
+model Category {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+
+  // Relations
+  books       BookCategory[]
+
+  @@map("categories")
+}
+
+model BookCategory {
+  bookId      String
+  categoryId  String
+
+  book        Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  category    Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([bookId, categoryId])
+  @@map("book_categories")
+}
+
+model BookReview {
+  id          String   @id @default(uuid())
+  bookId      String
+  userId      String
+  rating      Int      // 1-5 stars
+  comment     String?
+  createdAt   DateTime @default(now())
+
+  book        Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([bookId, userId])
+  @@map("book_reviews")
+}
+
+// ==================== BORROW & RETURN MANAGEMENT ====================
+
+model Borrowing {
+  id          String      @id @default(uuid())
+  userId      String
+  bookId      String
+  borrowDate  DateTime    @default(now())
+  dueDate     DateTime
+  returnDate  DateTime?
+  status      BorrowStatus @default(BORROWED)
+  renewCount  Int         @default(0)
+  maxRenewals Int         @default(2)
+  notes       String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  // Relations
+  user        User        @relation(fields: [userId], references: [id])
+  book        Book        @relation(fields: [bookId], references: [id])
+  fines       Fine[]
+
+  @@map("borrowings")
+}
+
+enum BorrowStatus {
+  BORROWED
+  RETURNED
+  OVERDUE
+  LOST
+  DAMAGED
+}
+
+model Reservation {
+  id          String            @id @default(uuid())
+  userId      String
+  bookId      String
+  status      ReservationStatus @default(PENDING)
+  reservedAt  DateTime          @default(now())
+  expiresAt   DateTime
+  fulfilledAt DateTime?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  // Relations
+  user        User              @relation(fields: [userId], references: [id])
+  book        Book              @relation(fields: [bookId], references: [id])
+
+  @@unique([userId, bookId])  
+  @@map("reservations")
+}
+
+enum ReservationStatus {
+  PENDING
+  FULFILLED
+  EXPIRED
+  CANCELLED
+}
+
+// ==================== INVENTORY MANAGEMENT ====================
+
+model InventoryLog {
+  id          String        @id @default(uuid())
+  bookId      String
+  action      InventoryAction
+  quantity    Int
+  reason      String?
+  performedBy String
+  createdAt   DateTime      @default(now())
+
+  // Relations
+  book        Book          @relation(fields: [bookId], references: [id])
+  user        User          @relation(fields: [performedBy], references: [id])
+
+  @@map("inventory_logs")
+}
+
+enum InventoryAction {
+  ADDED
+  REMOVED
+  DAMAGED
+  LOST
+  MAINTENANCE
+}
+
+model BookCondition {
+  id          String          @id @default(uuid())
+  bookId      String
+  condition   ConditionStatus @default(GOOD)
+  notes       String?
+  assessedBy  String
+  assessedAt  DateTime        @default(now())
+
+  // Relations
+  book        Book            @relation(fields: [bookId], references: [id])
+  assessor    User            @relation(fields: [assessedBy], references: [id])
+
+  @@map("book_conditions")
+}
+
+enum ConditionStatus {
+  EXCELLENT
+  GOOD
+  FAIR
+  POOR
+  DAMAGED
+}
+
+// ==================== FINE & PAYMENT MANAGEMENT ====================
+
+model Fine {
+  id          String     @id @default(uuid())
+  userId      String
+  borrowingId String?
+  type        FineType
+  amount      Int        // Amount in cents
+  reason      String
+  status      FineStatus @default(PENDING)
+  issuedAt    DateTime   @default(now())
+  paidAt      DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  // Relations
+  user        User       @relation(fields: [userId], references: [id])
+  borrowing   Borrowing? @relation(fields: [borrowingId], references: [id])
+  payments    Payment[]
+
+  @@map("fines")
+}
+
+enum FineType {
+  OVERDUE
+  LOST_BOOK
+  DAMAGED_BOOK
+  LATE_RETURN
+  OTHER
+}
+
+enum FineStatus {
+  PENDING
+  PAID
+  WAIVED
+  PARTIAL
+}
+
+model Payment {
+  id          String        @id @default(uuid())
+  userId      String
+  fineId      String?
+  amount      Int           // Amount in cents
+  method      PaymentMethod
+  status      PaymentStatus @default(PENDING)
+  reference   String?       // Transaction reference
+  paidAt      DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  // Relations
+  user        User          @relation(fields: [userId], references: [id])
+  fine        Fine?         @relation(fields: [fineId], references: [id])
+
+  @@map("payments")
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  ONLINE
+  BANK_TRANSFER
+  UPI
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+// ==================== NOTIFICATIONS & ALERTS ====================
+
+model Notification {
+  id          String             @id @default(uuid())
+  userId      String
+  type        NotificationType
+  title       String
+  message     String
+  isRead      Boolean            @default(false)
+  priority    NotificationPriority @default(NORMAL)
+  relatedId   String?            // Related borrowing, fine, or reservation ID
+  scheduledAt DateTime?          // For scheduled notifications
+  sentAt      DateTime?
+  createdAt   DateTime           @default(now())
+
+  // Relations
+  user        User               @relation(fields: [userId], references: [id])
+
+  @@map("notifications")
+}
+
+enum NotificationType {
+  DUE_REMINDER
+  OVERDUE_ALERT
+  FINE_NOTICE
+  RESERVATION_READY
+  MEMBERSHIP_EXPIRY
+  BOOK_RETURN_CONFIRMATION
+  SYSTEM_ANNOUNCEMENT
+}
+
+enum NotificationPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+model NotificationSettings {
+  id          String   @id @default(uuid())
+  userId      String   @unique
+  emailNotifications Boolean @default(true)
+  smsNotifications   Boolean @default(false)
+  pushNotifications  Boolean @default(true)
+  dueReminders       Boolean @default(true)
+  overdueAlerts      Boolean @default(true)
+  fineNotices        Boolean @default(true)
+  reservationAlerts  Boolean @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notification_settings")
+}
+
+// ==================== SYSTEM CONFIGURATION ====================
+
+model LibrarySettings {
+  id                    String   @id @default(uuid())
+  maxBorrowDays         Int      @default(14)
+  maxRenewalCount       Int      @default(2)
+  overdueFinePerDay    Int      @default(10) 
+  lostBookFineMultiplier Float   @default(2.0)
+  reservationExpiryHours Int     @default(48)
+  maxBooksPerUser       Int      @default(3)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@map("library_settings")
+}
+
+// ==================== ADDITIONAL HELPFUL MODELS ====================
+
+model Author {
+  id          String   @id @default(uuid())
+  name        String   @unique
+  biography   String?
+  birthDate   DateTime?
+  nationality String?
+  createdAt   DateTime @default(now())
+
+  // Relations
+  books       BookAuthor[]
+
+  @@map("authors")
+}
+
+model BookAuthor {
+  bookId      String
+  authorId    String
+
+  book        Book     @relation(fields: [bookId], references: [id], onDelete: Cascade)
+  author      Author   @relation(fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@id([bookId, authorId])
+  @@map("book_authors")
+}

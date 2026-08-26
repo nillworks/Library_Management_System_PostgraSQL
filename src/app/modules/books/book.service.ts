@@ -7,14 +7,6 @@ const createBooksDB = async (payload: IBook) => {
   });
 };
 
-//* books category service
-const createCategoryDB = async (payload: any) => {
-  return prisma.category.create({
-    data: payload,
-  });
-};
-
 export const booksService = {
   createBooksDB,
-  createCategoryDB,
 };

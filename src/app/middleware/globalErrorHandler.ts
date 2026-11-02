@@ -1,5 +1,8 @@
-import { NextFunction, Request, Response } from 'express';
-import { status } from 'http-status';
+type Request = unknown;
+type Response = {
+  status(code: number): { json(body: unknown): unknown };
+};
+type NextFunction = (error?: unknown) => void;
 
 export const globalErrorHandler = (
   err: any,
@@ -15,7 +18,7 @@ export const globalErrorHandler = (
     }
   }
 
-  res.status(status.INTERNAL_SERVER_ERROR).json({
+  res.status(500).json({
     success: false,
     stack: err.stack,
     message: errorMessage,
